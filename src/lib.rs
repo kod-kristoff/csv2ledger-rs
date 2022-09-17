@@ -80,7 +80,11 @@ impl Transaction {
 
 impl Display for Transaction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}\t{} {}", self.account, self.amount, self.commodity)?;
+        write!(
+            f,
+            "{:<40}\t{:>8} {}",
+            self.account, self.amount, self.commodity
+        )?;
         if let Some(comment) = &self.comment {
             write!(f, " ; {}", comment)
         } else {
