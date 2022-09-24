@@ -1,66 +1,31 @@
-use chrono::NaiveDate;
-use csv2ledger::{Entry, Transaction};
+use clap::{crate_authors, crate_description, crate_version, Arg, Command};
+use csv2ledger::process::Record2Entry;
 use env_logger::Env;
-use rust_decimal::Decimal;
 use std::fs;
 use std::io::Read;
 
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all(deserialize = "PascalCase"))]
-pub struct SwedbankRow {
-    clearingnummer: u32,
-    kontonummer: u32,
-    valuta: String,
-    bokföringsdag: NaiveDate,
-    transaktionsdag: NaiveDate,
-    referens: String,
-    beskrivning: String,
-    belopp: Decimal,
-    #[serde(alias = "Bokfört saldo")]
-    bokfört_saldo: Decimal,
-}
-
-impl From<SwedbankRow> for Entry {
-    fn from(row: SwedbankRow) -> Entry {
-        let mut transactions = Vec::new();
-        transactions.push(Transaction::new(
-            format!(
-                "Tillgång:Bank:Swedbank:{}:{}",
-                row.clearingnummer, row.kontonummer
-            ),
-            row.belopp,
-            row.valuta.clone(),
-        ));
-        let account = if row.belopp < Decimal::from(0) {
-            format!("Kostnad:Import:{}", row.beskrivning)
-        } else {
-            format!("Inkomst:Import:{}", row.beskrivning)
-        };
-        transactions.push(Transaction::new(account, -row.belopp, row.valuta));
-        let entry = Entry::new(row.transaktionsdag, row.beskrivning, transactions)
-            .with_comment(format!("referens: {}", row.referens));
-        if row.transaktionsdag != row.bokföringsdag {
-            entry.with_secondary_date(row.bokföringsdag)
-        } else {
-            entry
-        }
-    }
-}
-fn write_row(row: Entry) -> Result<(), Box<dyn std::error::Error>> {
-    println!("{}", row);
-    Ok(())
-}
-
 fn try_main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = std::env::args().collect();
+    let args = cli().get_matches();
     println!("args = {:?}", args);
-    println!("args.len() = {}", args.len());
-    let data_read = decode_data(&args[1])?;
-    let mut rdr = csv::Reader::from_reader(&data_read[..]);
-    for result in rdr.deserialize() {
-        let record: SwedbankRow = result?;
-        write_row(record.into())?;
-    }
+    let csv_path = args
+        .get_one::<String>("input")
+        .expect("`input` is required");
+    let output = args
+        .get_one::<String>("output")
+        .expect("`output` is required");
+    let config_path = args.get_one::<String>("config");
+    let mut fp_out = fs::File::create(output)?;
+    let data_read = decode_data(csv_path)?;
+    // let mut rdr = csv::Reader::from_reader(&data_read[..]);
+    let processor = match config_path {
+        None => Record2Entry::new(),
+        Some(path) => Record2Entry::from_path(path)?,
+    };
+    processor.csv_to_ledger(&data_read[..], &mut fp_out)?;
+    // for result in rdr.deserialize() {
+    //     let record: SwedbankRow = result?;
+    //     write_row(record.into())?;
+    // }
     Ok(())
 }
 
@@ -83,4 +48,19 @@ fn decode_data(data: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         log::warn!("Buffer contained malformed chars");
     }
     Ok(decoded_buffer.as_bytes().to_vec())
+}
+
+fn cli() -> Command<'static> {
+    Command::new("csv2ledger")
+        .version(crate_version!())
+        .author(crate_authors!())
+        .about(crate_description!())
+        .arg(
+            Arg::new("config")
+                .long("config")
+                .short('c')
+                .takes_value(true),
+        )
+        .arg(Arg::new("input").takes_value(true).required(true))
+        .arg(Arg::new("output").takes_value(true).required(true))
 }

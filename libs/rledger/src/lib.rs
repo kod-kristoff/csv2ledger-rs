@@ -2,6 +2,12 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use std::fmt::Display;
 
+pub enum State {
+    Uncleared,
+    Pending,
+    Cleared,
+}
+
 #[derive(Debug)]
 pub struct Entry {
     date: NaiveDate,
@@ -60,6 +66,7 @@ pub struct Transaction {
     amount: Decimal,
     commodity: String,
     comment: Option<String>,
+    assertion: Option<(Decimal, String)>,
 }
 
 impl Transaction {
@@ -69,11 +76,17 @@ impl Transaction {
             amount,
             commodity,
             comment: None,
+            assertion: None,
         }
     }
 
     pub fn with_comment(mut self, comment: String) -> Self {
         self.comment = Some(comment);
+        self
+    }
+
+    pub fn assertion(mut self, amount: Decimal, commodity: String) -> Self {
+        self.assertion = Some((amount, commodity));
         self
     }
 }
@@ -85,6 +98,9 @@ impl Display for Transaction {
             "{:<40}\t{:>8} {}",
             self.account, self.amount, self.commodity
         )?;
+        if let Some(assertion) = &self.assertion {
+            write!(f, " = {} {}", assertion.0, assertion.1)?;
+        }
         if let Some(comment) = &self.comment {
             write!(f, " ; {}", comment)
         } else {

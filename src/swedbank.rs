@@ -7,16 +7,16 @@ use std::io::Read;
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all(deserialize = "PascalCase"))]
 pub struct SwedbankRow {
-    clearingnummer: u32,
-    kontonummer: u32,
-    valuta: String,
-    bokföringsdag: NaiveDate,
-    transaktionsdag: NaiveDate,
-    referens: String,
-    beskrivning: String,
-    belopp: Decimal,
+    pub clearingnummer: u32,
+    pub kontonummer: u32,
+    pub valuta: String,
+    pub bokföringsdag: NaiveDate,
+    pub transaktionsdag: NaiveDate,
+    pub referens: String,
+    pub beskrivning: String,
+    pub belopp: Decimal,
     #[serde(alias = "Bokfört saldo")]
-    bokfört_saldo: Decimal,
+    pub bokfört_saldo: Decimal,
 }
 
 impl From<SwedbankRow> for Entry {
