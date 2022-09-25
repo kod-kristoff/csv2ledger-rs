@@ -1,8 +1,8 @@
 use crate::swedbank::SwedbankRow;
+use crate::Error;
 use rledger::{Entry, Transaction};
 use rust_decimal::Decimal;
 use std::collections::HashMap;
-use std::io::Read;
 use std::{fs, io};
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -21,12 +21,14 @@ impl Record2Entry {
         }
     }
 
-    pub fn from_path<P: AsRef<std::path::Path>>(
-        path: P,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_path<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Error> {
         let mut file = fs::File::open(path)?;
+        Self::from_reader(&mut file)
+    }
+
+    pub fn from_reader(reader: &mut dyn io::Read) -> Result<Self, Error> {
         let mut data = String::new();
-        file.read_to_string(&mut data)?;
+        reader.read_to_string(&mut data)?;
         let r: Self = serde_json::from_str(&data)?;
         Ok(r)
     }
@@ -100,7 +102,7 @@ impl Record2Entry {
         // reader: Box<dyn io::Read>,
         reader: &[u8],
         writer: &mut dyn io::Write,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Error> {
         let mut rdr = csv::Reader::from_reader(reader);
         for result in rdr.deserialize() {
             // let record: SwedbankRow = result?;

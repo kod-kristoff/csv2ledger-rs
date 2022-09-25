@@ -1,12 +1,12 @@
-use clap::{crate_authors, crate_description, crate_version, Arg, Command};
-use csv2ledger::process::Record2Entry;
+use clap::{crate_authors, crate_description, crate_name, crate_version, Arg, Command};
+use csv2ledger::{process::Record2Entry, Error};
 use env_logger::Env;
+use eyre::WrapErr;
 use std::fs;
 use std::io::Read;
 
-fn try_main() -> Result<(), Box<dyn std::error::Error>> {
+fn try_main() -> Result<(), eyre::Report> {
     let args = cli().get_matches();
-    println!("args = {:?}", args);
     let csv_path = args
         .get_one::<String>("input")
         .expect("`input` is required");
@@ -18,8 +18,27 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     let data_read = decode_data(csv_path)?;
     // let mut rdr = csv::Reader::from_reader(&data_read[..]);
     let processor = match config_path {
-        None => Record2Entry::new(),
-        Some(path) => Record2Entry::from_path(path)?,
+        Some(path) => {
+            let mut config_fp = fs::File::open(path)
+                .wrap_err_with(|| format!("Failed to read config from '{}'", path))?;
+            Record2Entry::from_reader(&mut config_fp)?
+        }
+        None => {
+            if let Some(proj_dirs) = directories::ProjectDirs::from("ml", "kristoff", crate_name!())
+            {
+                let path = proj_dirs.config_dir().join("csv2ledger.config.json");
+                match fs::File::open(&path) {
+                    Ok(mut fp) => Record2Entry::from_reader(&mut fp)?,
+                    Err(err) => {
+                        log::info!("Failed read config from '{}", path.display());
+                        log::info!(" Caused by: '{}", err);
+                        Record2Entry::new()
+                    }
+                }
+            } else {
+                Record2Entry::new()
+            }
+        }
     };
     processor.csv_to_ledger(&data_read[..], &mut fp_out)?;
     // for result in rdr.deserialize() {
@@ -39,7 +58,7 @@ fn main() {
     }
 }
 
-fn decode_data(data: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+fn decode_data(data: &str) -> Result<Vec<u8>, Error> {
     let mut file = fs::File::open(data)?;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;
@@ -51,7 +70,7 @@ fn decode_data(data: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 }
 
 fn cli() -> Command<'static> {
-    Command::new("csv2ledger")
+    Command::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())

@@ -20,3 +20,5 @@ serde = { version = "1.0.144", features = ["derive"] }
 rledger = { path = "libs/rledger" }
 clap = { version = "3.2.22", features = ["cargo"] }
 serde_json = "1.0.85"
+directories = "4.0.1"
+eyre = "0.6.8"
